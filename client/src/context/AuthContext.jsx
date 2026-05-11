@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ user, login, logout, updateTrainer, loading }}>
-      {!loading && children}
+      {loading ? <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', color: '#fff' }}>Loading FitLife...</div> : children}
     </AuthContext.Provider>
   );
 };

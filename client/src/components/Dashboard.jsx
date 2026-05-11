@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Flame, Dumbbell, Activity, User as UserIcon } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Flame, Dumbbell, Activity, User as UserIcon, Play, Trophy, CheckCircle } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
   const [plans, setPlans] = useState([]);
   const [trainer, setTrainer] = useState(null);
@@ -17,10 +19,13 @@ export default function Dashboard() {
     Promise.all([
       fetch('/api/logs', { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json()),
       fetch('/api/plans', { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json()),
+      fetch('/api/me', { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json()),
       user.trainer_id ? fetch('/api/trainers', { headers: { 'Authorization': `Bearer ${token}` }}).then(r => r.json()) : Promise.resolve([])
-    ]).then(([logsData, plansData, trainersData]) => {
+    ]).then(([logsData, plansData, userData, trainersData]) => {
       setLogs(logsData);
       setPlans(plansData);
+      // Update local user with latest XP/Level/Personalization from DB
+      Object.assign(user, userData);
       if (user.trainer_id) {
         const t = trainersData.find(x => x.id === user.trainer_id);
         if (t) setTrainer(t);
@@ -57,8 +62,39 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h2 className="heading">Welcome, {user.username}!</h2>
-      <p className="subheading">Here's your fitness overview today.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 className="heading">Welcome, {user.username}!</h2>
+          <p className="subheading" style={{ margin: 0 }}>Here's your fitness overview today.</p>
+        </div>
+        <div className="glass-panel" style={{ padding: '0.8rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button 
+            onClick={() => navigate('/tracker?session=start')}
+            className="btn" 
+            style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #10b981, #059669)' }}
+          >
+            <Play size={18} fill="currentColor" /> One-Tap Start
+          </button>
+          <div style={{ width: '1px', height: '30px', background: 'var(--glass-border)' }}></div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Streak</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#fb923c' }}>{user.streak_count || 0} 🔥</div>
+          </div>
+          <div style={{ width: '1px', height: '30px', background: 'var(--glass-border)' }}></div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Level</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#38bdf8' }}>{user.level || 1}</div>
+          </div>
+          <div style={{ width: '1px', height: '30px', background: 'var(--glass-border)' }}></div>
+          <div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>Total XP</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>{user.xp || 0}</div>
+            <div style={{ width: '100px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${(user.xp % 100)}%`, height: '100%', background: '#38bdf8' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid">
         <div className="glass-panel glass-panel-hover" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -83,6 +119,11 @@ export default function Dashboard() {
               <span style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#ef4444' }}>{totalCalories}</span>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>kcal</span>
             </div>
+          </div>
+          <div style={{ marginTop: '1rem', textAlign: 'center', background: 'rgba(56, 189, 248, 0.1)', padding: '0.5rem', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold' }}>
+              PREDICTION: {user.daysToGoal} days to reach goal
+            </span>
           </div>
         </div>
 
@@ -124,52 +165,76 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'minmax(300px, 2fr) minmax(300px, 1fr)', marginTop: '2rem' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'minmax(300px, 1fr) minmax(300px, 1fr) minmax(300px, 1fr)', marginTop: '2rem' }}>
         <div className="glass-panel">
-          <h3 className="heading-sm" style={{ marginBottom: '1.5rem' }}>Calorie Burn Trend</h3>
+          <h3 className="heading-sm" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Activity color="#818cf8" size={20} /> AI Readiness
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem' }}>Sleep Quality</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{user.sleep_score}%</span>
+              </div>
+              <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${user.sleep_score}%`, height: '100%', background: user.sleep_score > 70 ? '#10b981' : '#f59e0b' }}></div>
+              </div>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem' }}>Stress Level</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{user.stress_score}%</span>
+              </div>
+              <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${user.stress_score}%`, height: '100%', background: user.stress_score < 40 ? '#10b981' : '#ef4444' }}></div>
+              </div>
+            </div>
+            <div style={{ padding: '0.8rem', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)', marginTop: '0.5rem' }}>
+              <p style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: '600' }}>
+                {user.stress_score > 60 || user.sleep_score < 50 
+                  ? "AI Advice: High fatigue detected. Suggesting mobility and active recovery today."
+                  : "AI Advice: Readiness is high. Perfect day for high-intensity training!"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-panel">
+          <h3 className="heading-sm" style={{ marginBottom: '1.5rem' }}>Performance Trends</h3>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <span className="badge" style={{ cursor: 'pointer', background: '#3b82f6', color: '#fff' }}>Calories</span>
+            <span className="badge" style={{ cursor: 'pointer' }}>Strength</span>
+          </div>
           {chartData.length > 0 ? (
-            <div style={{ width: '100%', height: '300px' }}>
+            <div style={{ width: '100%', height: '180px' }}>
               <ResponsiveContainer>
                 <LineChart data={chartData}>
-                  <XAxis dataKey="date" stroke="var(--text-secondary)" />
-                  <YAxis stroke="var(--text-secondary)" />
-                  <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                  <Line type="monotone" dataKey="calories" stroke="#3b82f6" strokeWidth={3} dot={{ r: 5, fill: '#3b82f6' }} />
+                  <Line type="monotone" dataKey="calories" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                  <Tooltip contentStyle={{ background: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '0.8rem' }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-             <div style={{ height: '300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-secondary)' }}>Log activities to see your trend.</div>
+             <div style={{ height: '180px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Log activities to see your trend.</div>
           )}
         </div>
 
         <div className="glass-panel">
-          <h3 className="heading-sm" style={{ marginBottom: '1.5rem' }}>Recent Activity</h3>
-          {logs.length > 0 ? (
-            <div style={{ overflowX: 'auto', maxHeight: '300px' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                    <th style={{ padding: '1rem 0' }}>Activity</th>
-                    <th>Cal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.slice(0, 5).map(log => (
-                    <tr key={log.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                      <td style={{ padding: '1rem 0' }}>
-                        <div>{log.activity}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{log.duration_minutes}m</div>
-                      </td>
-                      <td style={{ color: '#ef4444', fontWeight: 'bold' }}>{log.calories_burned}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>No recent activity logged.</p>
-          )}
+          <h3 className="heading-sm" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Trophy color="#f59e0b" size={20} /> Daily Missions
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {(user.missions || []).map(m => (
+              <div key={m.id} style={{ padding: '0.8rem', background: m.completed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: `1px solid ${m.completed ? 'rgba(16, 185, 129, 0.2)' : 'var(--glass-border)'}`, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {m.completed ? <CheckCircle size={18} color="#10b981" /> : <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid var(--text-secondary)' }}></div>}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: '600', color: m.completed ? '#10b981' : 'var(--text-primary)' }}>{m.title}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{m.description}</div>
+                </div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#f59e0b' }}>+{m.xp} XP</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
